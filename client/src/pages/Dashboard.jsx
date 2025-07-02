@@ -32,6 +32,9 @@ const Card = ({ label, count, bg, icon }) => {
       >
         {icon}
       </div>
+       <footer className="w-full text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+  Built with ❤️ by Shivagya
+</footer>
     </div>
   );
 };
