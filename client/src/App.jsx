@@ -8,6 +8,7 @@ import { Navbar, Sidebar } from "./components";
 import {
   Dashboard,
   Login,
+  Register,
   TaskDetail,
   Tasks,
   Trash,
@@ -22,7 +23,7 @@ function Layout() {
 
   return user ? (
     <div className='w-full h-screen flex flex-col md:flex-row'>
-      <div className='w-1/5 h-screen bg-white dark:bg-[#1f1f1f] sticky top-0 hidden md:block'>
+      <div className='hidden md:block md:w-1/5 lg:w-1/6 h-screen bg-white dark:bg-[#1f1f1f] sticky top-0'>
         <Sidebar />
       </div>
 
@@ -31,7 +32,7 @@ function Layout() {
       <div className='flex-1 overflow-y-auto'>
         <Navbar />
 
-        <div className='p-4 2xl:px-10'>
+        <div className='p-2 sm:p-4 md:p-6 2xl:px-10'>
           <Outlet />
         </div>
       </div>
@@ -69,7 +70,7 @@ const MobileSidebar = () => {
              ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
             onClick={() => closeSidebar()}
           >
-            <div className='bg-white w-3/4 h-full'>
+            <div className='bg-white w-4/5 sm:w-2/3 md:w-1/2 h-full'>
               <div className='w-full flex justify-end px-5 pt-5'>
                 <button
                   onClick={() => closeSidebar()}
@@ -111,6 +112,8 @@ const App = () => {
           </Route>
 
           <Route path='/log-in' element={<Login />} />
+          <Route path='/login' element={<Login />} />
+          <Route path='/register' element={<Register />} />
         </Routes>
       </div>
 

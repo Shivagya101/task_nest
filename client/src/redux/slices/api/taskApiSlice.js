@@ -31,11 +31,17 @@ export const postApiSlice = apiSlice.injectEndpoints({
     }),
 
     getAllTask: builder.query({
-      query: ({ strQuery, isTrashed, search }) => ({
-        url: `${TASKS_URL}?stage=${strQuery}&isTrashed=${isTrashed}&search=${search}`,
-        method: "GET",
-        credentials: "include",
-      }),
+      query: ({ strQuery, isTrashed, search, lessThan3Days }) => {
+        let url = `${TASKS_URL}?stage=${strQuery}&isTrashed=${isTrashed}&search=${search}`;
+        if (lessThan3Days) {
+          url += `&lessThan3Days=true`;
+        }
+        return {
+          url,
+          method: "GET",
+          credentials: "include",
+        };
+      },
     }),
 
     getSingleTask: builder.query({

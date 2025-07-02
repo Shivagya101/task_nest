@@ -15,10 +15,10 @@ import {
   useTrashTastMutation,
 } from "../../redux/slices/api/taskApiSlice";
 import ConfirmatioDialog from "../ConfirmationDialog";
-import AddSubTask from "./AddSubTask";
 import AddTask from "./AddTask";
 import TaskColor from "./TaskColor";
 import { useSelector } from "react-redux";
+import React from "react";
 
 const CustomTransition = ({ children }) => (
   <Transition
@@ -34,7 +34,7 @@ const CustomTransition = ({ children }) => (
   </Transition>
 );
 
-const ChangeTaskActions = ({ _id, stage }) => {
+const ChangeTaskActions = React.forwardRef(({ _id, stage }, ref) => {
   const [changeStage] = useChangeTaskStageMutation();
 
   const changeHanlder = async (val) => {
@@ -77,8 +77,16 @@ const ChangeTaskActions = ({ _id, stage }) => {
     },
   ];
 
+  // Debug log for permissions
+  const user = useSelector((state) => state.auth.user);
+  console.log("TaskDialog debug:", {
+    createdBy: stage?.createdBy,
+    userId: user?._id,
+    isAdmin: user?.isAdmin
+  });
+
   return (
-    <>
+    <div ref={ref}>
       <Menu as='div' className='relative inline-block text-left'>
         <Menu.Button
           className={clsx(
@@ -113,11 +121,11 @@ const ChangeTaskActions = ({ _id, stage }) => {
           </Menu.Items>
         </CustomTransition>
       </Menu>
-    </>
+    </div>
   );
-};
+});
 
-export default function TaskDialog({ task }) {
+export default function TaskDialog({ task, refetch }) {
   const { user } = useSelector((state) => state.auth);
   const [open, setOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
@@ -143,7 +151,7 @@ export default function TaskDialog({ task }) {
 
       setTimeout(() => {
         setOpenDialog(false);
-        window.location.reload();
+        if (refetch) refetch();
       }, 500);
     } catch (err) {
       console.log(err);
@@ -178,16 +186,6 @@ export default function TaskDialog({ task }) {
       icon: <MdOutlineEdit className='mr-2 h-5 w-5' aria-hidden='true' />,
       onClick: () => setOpenEdit(true),
     },
-    {
-      label: "Add Sub-Task",
-      icon: <MdAdd className='mr-2 h-5 w-5' aria-hidden='true' />,
-      onClick: () => setOpen(true),
-    },
-    {
-      label: "Duplicate",
-      icon: <HiDuplicate className='mr-2 h-5 w-5' aria-hidden='true' />,
-      onClick: () => duplicateHanlder(),
-    },
   ];
 
   return (
@@ -203,18 +201,23 @@ export default function TaskDialog({ task }) {
               <div className='px-1 py-1 space-y-2'>
                 {items.map((el, index) => (
                   <Menu.Item key={el.label}>
-                    {({ active }) => (
-                      <button
-                        disabled={index === 0 ? false : !user.isAdmin}
-                        onClick={el?.onClick}
-                        className={`${
-                          active ? "bg-blue-500 text-white" : "text-gray-900"
-                        } group flex w-full items-center rounded-md px-2 py-2 text-sm disabled:text-gray-400`}
-                      >
-                        {el.icon}
-                        {el.label}
-                      </button>
-                    )}
+                    {({ active }) => {
+                      const creatorId = task.createdBy?._id || task.createdBy;
+                      const canEditOrDelete = user.isAdmin || String(creatorId) === String(user._id);
+                      const isDisabled = index === 0 ? false : !canEditOrDelete;
+                      return (
+                        <button
+                          disabled={isDisabled}
+                          onClick={el?.onClick}
+                          className={`${
+                            active ? "bg-blue-500 text-white" : "text-gray-900"
+                          } group flex w-full items-center rounded-md px-2 py-2 text-sm disabled:text-gray-400`}
+                        >
+                          {el.icon}
+                          {el.label}
+                        </button>
+                      );
+                    }}
                   </Menu.Item>
                 ))}
               </div>
@@ -227,21 +230,25 @@ export default function TaskDialog({ task }) {
 
               <div className='px-1 py-1'>
                 <Menu.Item>
-                  {({ active }) => (
-                    <button
-                      disabled={!user.isAdmin}
-                      onClick={() => deleteClicks()}
-                      className={`${
-                        active ? "bg-red-100 text-red-900" : "text-red-900"
-                      } group flex w-full items-center rounded-md px-2 py-2 text-sm disabled:text-gray-400`}
-                    >
-                      <RiDeleteBin6Line
-                        className='mr-2 h-5 w-5 text-red-600'
-                        aria-hidden='true'
-                      />
-                      Delete
-                    </button>
-                  )}
+                  {({ active }) => {
+                    const creatorId = task.createdBy?._id || task.createdBy;
+                    const canEditOrDelete = user.isAdmin || String(creatorId) === String(user._id);
+                    return (
+                      <button
+                        disabled={!canEditOrDelete}
+                        onClick={() => deleteClicks()}
+                        className={`${
+                          active ? "bg-red-100 text-red-900" : "text-red-900"
+                        } group flex w-full items-center rounded-md px-2 py-2 text-sm disabled:text-gray-400`}
+                      >
+                        <RiDeleteBin6Line
+                          className='mr-2 h-5 w-5 text-red-600'
+                          aria-hidden='true'
+                        />
+                        Delete
+                      </button>
+                    );
+                  }}
                 </Menu.Item>
               </div>
             </Menu.Items>
@@ -255,7 +262,6 @@ export default function TaskDialog({ task }) {
         task={task}
         key={new Date().getTime()}
       />
-      <AddSubTask open={open} setOpen={setOpen} />
       <ConfirmatioDialog
         open={openDialog}
         setOpen={setOpenDialog}

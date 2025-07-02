@@ -1,10 +1,4 @@
 import { Dialog } from "@headlessui/react";
-import {
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytesResumable,
-} from "firebase/storage";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { BiImages } from "react-icons/bi";
@@ -15,7 +9,6 @@ import {
   useUpdateTaskMutation,
 } from "../../redux/slices/api/taskApiSlice";
 import { dateFormatter } from "../../utils";
-import { app } from "../../utils/firebase";
 import Button from "../Button";
 import Loading from "../Loading";
 import ModalWrapper from "../ModalWrapper";
@@ -26,49 +19,16 @@ import UserList from "./UsersSelect";
 const LISTS = ["TODO", "IN PROGRESS", "COMPLETED"];
 const PRIORIRY = ["HIGH", "MEDIUM", "NORMAL", "LOW"];
 
-const uploadedFileURLs = [];
-
-const uploadFile = async (file) => {
-  const storage = getStorage(app);
-
-  const name = new Date().getTime() + file.name;
-  const storageRef = ref(storage, name);
-
-  const uploadTask = uploadBytesResumable(storageRef, file);
-
-  return new Promise((resolve, reject) => {
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        console.log("Uploading");
-      },
-      (error) => {
-        reject(error);
-      },
-      () => {
-        getDownloadURL(uploadTask.snapshot.ref)
-          .then((downloadURL) => {
-            uploadedFileURLs.push(downloadURL);
-            resolve();
-          })
-          .catch((error) => {
-            reject(error);
-          });
-      }
-    );
-  });
-};
-
 const AddTask = ({ open, setOpen, task }) => {
   const defaultValues = {
     title: task?.title || "",
     date: dateFormatter(task?.date || new Date()),
+    deadline: task?.deadline ? dateFormatter(task.deadline) : "",
     team: [],
     stage: "",
     priority: "",
     assets: [],
     description: "",
-    links: "",
   };
   const {
     register,
@@ -89,27 +49,15 @@ const AddTask = ({ open, setOpen, task }) => {
   const URLS = task?.assets ? [...task.assets] : [];
 
   const handleOnSubmit = async (data) => {
-    for (const file of assets) {
-      setUploading(true);
-      try {
-        await uploadFile(file);
-      } catch (error) {
-        console.error("Error uploading file:", error.message);
-        return;
-      } finally {
-        setUploading(false);
-      }
-    }
-
     try {
       const newData = {
         ...data,
-        assets: [...URLS, ...uploadedFileURLs],
+        assets: URLS,
         team,
         stage,
         priority,
+        deadline: data.deadline || null,
       };
-      console.log(data, newData);
       const res = task?._id
         ? await updateTask({ ...newData, _id: task._id }).unwrap()
         : await createTask(newData).unwrap();
@@ -120,13 +68,8 @@ const AddTask = ({ open, setOpen, task }) => {
         setOpen(false);
       }, 500);
     } catch (err) {
-      console.log(err);
       toast.error(err?.data?.message || err.error);
     }
-  };
-
-  const handleSelect = (e) => {
-    setAssets(e.target.files);
   };
 
   return (
@@ -180,23 +123,15 @@ const AddTask = ({ open, setOpen, task }) => {
                   })}
                   error={errors.date ? errors.date.message : ""}
                 />
-              </div>
-              <div className='w-full flex items-center justify-center mt-4'>
-                <label
-                  className='flex items-center gap-1 text-base text-ascent-2 hover:text-ascent-1 cursor-pointer my-4'
-                  htmlFor='imgUpload'
-                >
-                  <input
-                    type='file'
-                    className='hidden'
-                    id='imgUpload'
-                    onChange={(e) => handleSelect(e)}
-                    accept='.jpg, .png, .jpeg'
-                    multiple={true}
-                  />
-                  <BiImages />
-                  <span>Add Assets</span>
-                </label>
+                <Textbox
+                  placeholder='Deadline (optional)'
+                  type='date'
+                  name='deadline'
+                  label='Deadline (optional)'
+                  className='w-full rounded mt-2'
+                  register={register("deadline")}
+                  error={errors.deadline ? errors.deadline.message : ""}
+                />
               </div>
             </div>
 
@@ -205,23 +140,6 @@ const AddTask = ({ open, setOpen, task }) => {
               <textarea
                 name='description'
                 {...register("description")}
-                className='w-full bg-transparent px-3 py-1.5 2xl:py-3 border border-gray-300
-            dark:border-gray-600 placeholder-gray-300 dark:placeholder-gray-700
-            text-gray-900 dark:text-white outline-none text-base focus:ring-2
-            ring-blue-300'
-              ></textarea>
-            </div>
-
-            <div className='w-full'>
-              <p>
-                Add Links{" "}
-                <span className='text- text-gray-600'>
-                  seperated by comma (,)
-                </span>
-              </p>
-              <textarea
-                name='links'
-                {...register("links")}
                 className='w-full bg-transparent px-3 py-1.5 2xl:py-3 border border-gray-300
             dark:border-gray-600 placeholder-gray-300 dark:placeholder-gray-700
             text-gray-900 dark:text-white outline-none text-base focus:ring-2

@@ -5,5 +5,6 @@ import Tasks from "./Tasks";
 import Trash from "./Trash";
 import Users from "./Users";
 import StatusPage from "./Status";
+import Register from "./Register";
 
-export { Dashboard, Login, TaskDetail, Tasks, Trash, Users, StatusPage };
+export { Dashboard, Login, Register, TaskDetail, Tasks, Trash, Users, StatusPage };

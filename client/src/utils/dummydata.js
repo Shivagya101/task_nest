@@ -250,7 +250,7 @@ export const activitiesData = [
     type: "started",
     activity: "started this task.",
     date: new Date("2023-01-15").toISOString(),
-    by: "Akwasi Asante",
+    by: "John Doe",
   },
   {
     _id: "1",
@@ -263,9 +263,9 @@ export const activitiesData = [
   {
     _id: "2",
     type: "assigned",
-    activity: "task to Codewave Asante",
+    activity: "task to John Doe",
     date: new Date("2023-01-15").toISOString(),
-    by: "Akwasi Asante",
+    by: "John Doe",
   },
 
   {
@@ -279,16 +279,16 @@ export const activitiesData = [
   {
     _id: "5",
     type: "bug",
-    activity: "bug to Codewave Asante",
+    activity: "bug to John Doe",
     date: new Date("2023-01-15").toISOString(),
-    by: "Akwasi Asante",
+    by: "John Doe",
   },
   {
     _id: "4",
     type: "completed",
-    activity: "Codewave Asante has completed the task assigned",
+    activity: "John Doe has completed the task assigned",
     date: new Date("2023-01-15").toISOString(),
-    by: "Akwasi Asante",
+    by: "John Doe",
   },
 ];
 

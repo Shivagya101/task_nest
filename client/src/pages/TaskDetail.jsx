@@ -27,6 +27,7 @@ import {
   getCompletedSubTasks,
   getInitials,
 } from "../utils";
+import { useSelector } from "react-redux";
 
 const assets = [
   "https://images.pexels.com/photos/2418664/pexels-photo-2418664.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
@@ -205,6 +206,9 @@ const TaskDetail = () => {
 
   const [selected, setSelected] = useState(0);
   const task = data?.task || [];
+  const { user } = useSelector((state) => state.auth);
+  const [isCompleted, setIsCompleted] = useState(task.isCompleted);
+  const canMarkCompleted = user?.isAdmin || String(task.createdBy) === String(user?._id);
 
   const handleSubmitAction = async (el) => {
     try {
@@ -225,6 +229,25 @@ const TaskDetail = () => {
     }
   };
 
+  const handleMarkCompleted = async () => {
+    try {
+      const res = await fetch(`/api/task/${task._id}/mark-completed`, {
+        method: "PUT",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.status) {
+        setIsCompleted(data.isCompleted);
+        toast.success(data.message);
+        refetch();
+      } else {
+        toast.error(data.message);
+      }
+    } catch (err) {
+      toast.error("Failed to update task status");
+    }
+  };
+
   if (isLoading)
     <div className='py-10'>
       <Loading />
@@ -239,6 +262,19 @@ const TaskDetail = () => {
     <div className='w-full flex flex-col gap-3 mb-4 overflow-y-hidden'>
       {/* task detail */}
       <h1 className='text-2xl text-gray-600 font-bold'>{task?.title}</h1>
+      {task?.deadline && (
+        <div className='text-red-600 dark:text-red-400 text-sm mb-2'>
+          <strong>Deadline:</strong> {moment(task.deadline).format('YYYY-MM-DD')}
+        </div>
+      )}
+      {canMarkCompleted && (
+        <button
+          onClick={handleMarkCompleted}
+          className={`mt-2 px-3 py-1 rounded text-xs font-semibold ${isCompleted ? "bg-green-200 text-green-800" : "bg-gray-200 text-gray-800"}`}
+        >
+          {isCompleted ? "Mark as Not Completed" : "Mark as Completed"}
+        </button>
+      )}
       <Tabs tabs={TABS} setSelected={setSelected}>
         {selected === 0 ? (
           <>

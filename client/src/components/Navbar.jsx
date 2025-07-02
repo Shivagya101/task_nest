@@ -22,7 +22,6 @@ const Navbar = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    window.location.reload();
   };
 
   return (

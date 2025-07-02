@@ -46,6 +46,9 @@ const taskSchema = new Schema(
     links: [String],
     team: [{ type: Schema.Types.ObjectId, ref: "User" }],
     isTrashed: { type: Boolean, default: false },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+    isCompleted: { type: Boolean, default: false },
+    deadline: { type: Date, default: null },
   },
   { timestamps: true }
 );

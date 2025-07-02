@@ -102,6 +102,10 @@ const Login = () => {
                 className='w-full h-10 bg-blue-700 text-white rounded-full'
               />
             )}
+            <p className='text-center text-sm text-gray-600 mt-2'>
+              Don&apos;t have an account?{' '}
+              <a href='/register' className='text-blue-600 hover:underline'>Register</a>
+            </p>
           </form>
         </div>
       </div>

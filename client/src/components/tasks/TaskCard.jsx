@@ -8,6 +8,9 @@ import {
 } from "react-icons/md";
 import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import { useDispatch } from "react-redux";
+import { useGetSingleTaskQuery } from "../../redux/slices/api/taskApiSlice";
 
 import {
   BGS,
@@ -16,7 +19,7 @@ import {
   formatDate,
 } from "../../utils/index.js";
 import UserInfo from "../UserInfo.jsx";
-import { AddSubTask, TaskAssets, TaskColor, TaskDialog } from "./index";
+import { TaskAssets, TaskColor, TaskDialog } from "./index";
 
 const ICONS = {
   high: <MdKeyboardDoubleArrowUp />,
@@ -24,9 +27,33 @@ const ICONS = {
   low: <MdKeyboardArrowDown />,
 };
 
-const TaskCard = ({ task }) => {
+const TaskCard = ({ task, refetch }) => {
   const { user } = useSelector((state) => state.auth);
   const [open, setOpen] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(task.isCompleted);
+
+  const creatorId = task.createdBy?._id || task.createdBy;
+  const canMarkCompleted = user.isAdmin || String(creatorId) === String(user._id);
+
+  const isAssignedToMe = task.team?.some((u) => String(u._id) === String(user._id));
+
+  const handleMarkCompleted = async () => {
+    try {
+      const res = await fetch(`/api/task/${task._id}/mark-completed`, {
+        method: "PUT",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.status) {
+        setIsCompleted(data.isCompleted);
+        toast.success(data.message);
+      } else {
+        toast.error(data.message);
+      }
+    } catch (err) {
+      toast.error("Failed to update task status");
+    }
+  };
 
   return (
     <>
@@ -41,7 +68,7 @@ const TaskCard = ({ task }) => {
             <span className='text-lg'>{ICONS[task?.priority]}</span>
             <span className='uppercase'>{task?.priority} Priority</span>
           </div>
-          <TaskDialog task={task} />
+          <TaskDialog task={task} refetch={refetch} />
         </div>
         <>
           <Link to={`/task/${task._id}`}>
@@ -50,18 +77,35 @@ const TaskCard = ({ task }) => {
               <h4 className='text- line-clamp-1 text-black dark:text-white'>
                 {task?.title}
               </h4>
+              {isAssignedToMe && (
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-200 text-blue-800">
+                  Assigned to You
+                </span>
+              )}
             </div>
           </Link>
           <span className='text-sm text-gray-600 dark:text-gray-400'>
-            {formatDate(new Date(task?.date))}
+            Created: {formatDate(new Date(task?.date))}
           </span>
+          {task.deadline && (
+            <span className='text-sm text-red-600 dark:text-red-400 block'>
+              Deadline: {formatDate(new Date(task.deadline))}
+            </span>
+          )}
+          {canMarkCompleted && (
+            <button
+              onClick={handleMarkCompleted}
+              className={`mt-2 px-3 py-1 rounded text-xs font-semibold ${isCompleted ? "bg-green-200 text-green-800" : "bg-gray-200 text-gray-800"}`}
+            >
+              {isCompleted ? "Mark as Not Completed" : "Mark as Completed"}
+            </button>
+          )}
         </>
 
         <div className='w-full border-t border-gray-200 dark:border-gray-700 my-2' />
         <div className='flex items-center justify-between mb-2'>
           <TaskAssets
             activities={task?.activities?.length}
-            subTasks={task?.subTasks}
             assets={task?.assets?.length}
           />
 
@@ -80,44 +124,7 @@ const TaskCard = ({ task }) => {
               ))}
           </div>
         </div>
-
-        {/* subtasks */}
-        {task?.subTasks?.length > 0 ? (
-          <div className='py-4 border-t border-gray-200 dark:border-gray-700'>
-            <h5 className='text-base line-clamp-1 text-black dark:text-gray-400'>
-              {task?.subTasks[0].title}
-            </h5>
-
-            <div className='p-4 space-x-8'>
-              <span className='text-sm text-gray-600 dark:text-gray-500'>
-                {formatDate(new Date(task?.subTasks[0]?.date))}
-              </span>
-              <span className='bg-blue-600/10 px-3 py-1 rounded-full text-blue-700 font-medium'>
-                {task?.subTasks[0]?.tag}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className='py-4 border-t border-gray-200 dark:border-gray-700'>
-              <span className='text-gray-500'>No Sub-Task</span>
-            </div>
-          </div>
-        )}
-
-        <div className='w-full pb-2'>
-          <button
-            disabled={user.isAdmin ? false : true}
-            onClick={() => setOpen(true)}
-            className='w-full flex gap-4 items-center text-sm text-gray-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300'
-          >
-            <IoMdAdd className='text-lg' />
-            <span>ADD SUBTASK</span>
-          </button>
-        </div>
       </div>
-
-      <AddSubTask open={open} setOpen={setOpen} id={task._id} />
     </>
   );
 };

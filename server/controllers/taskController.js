@@ -5,8 +5,10 @@ import User from "../models/userModel.js";
 
 const createTask = asyncHandler(async (req, res) => {
   try {
-    const { userId } = req.user;
-    const { title, team, stage, date, priority, assets, links, description } =
+    const userId = req.user._id;
+    console.log('DEBUG: userId in createTask:', userId);
+    console.log('DEBUG: req.user in createTask:', req.user);
+    const { title, team, stage, date, deadline, priority, assets, links, description } =
       req.body;
 
     //alert users of the task
@@ -37,12 +39,16 @@ const createTask = asyncHandler(async (req, res) => {
       team,
       stage: stage.toLowerCase(),
       date,
+      deadline,
       priority: priority.toLowerCase(),
       assets,
       activities: activity,
       links: newLinks || [],
       description,
+      createdBy: userId,
     });
+
+    console.log('DEBUG: Task saved:', task);
 
     await Notice.create({
       team,
@@ -74,7 +80,8 @@ const createTask = asyncHandler(async (req, res) => {
 const duplicateTask = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId } = req.user;
+    const userId = req.user._id;
+    const isAdmin = req.user.isAdmin;
 
     const task = await Task.findById(id);
 
@@ -130,20 +137,27 @@ const duplicateTask = asyncHandler(async (req, res) => {
 
 const updateTask = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { title, date, team, stage, priority, assets, links, description } =
-    req.body;
+  const userId = req.user._id;
+  const isAdmin = req.user.isAdmin;
+  const { title, date, deadline, team, stage, priority, assets, links, description } = req.body;
 
   try {
     const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found" });
+    }
+    if (!isAdmin && String(task.createdBy) !== String(userId)) {
+      return res.status(403).json({ status: false, message: "Not authorized to update this task" });
+    }
 
     let newLinks = [];
-
     if (links) {
       newLinks = links.split(",");
     }
 
     task.title = title;
     task.date = date;
+    task.deadline = deadline;
     task.priority = priority.toLowerCase();
     task.assets = assets;
     task.stage = stage.toLowerCase();
@@ -153,9 +167,7 @@ const updateTask = asyncHandler(async (req, res) => {
 
     await task.save();
 
-    res
-      .status(200)
-      .json({ status: true, message: "Task duplicated successfully." });
+    res.status(200).json({ status: true, message: "Task updated successfully." });
   } catch (error) {
     return res.status(400).json({ status: false, message: error.message });
   }
@@ -236,16 +248,33 @@ const createSubTask = asyncHandler(async (req, res) => {
 });
 
 const getTasks = asyncHandler(async (req, res) => {
-  const { userId, isAdmin } = req.user;
-  const { stage, isTrashed, search } = req.query;
+  const userId = req.user._id;
+  const isAdmin = req.user.isAdmin;
+  const { stage, isTrashed, search, lessThan3Days, filter } = req.query;
 
   let query = { isTrashed: isTrashed ? true : false };
 
+  // Filtering logic
   if (!isAdmin) {
-    query.team = { $all: [userId] };
+    if (filter === "assignedToMe") {
+      query.team = { $all: [userId] };
+    } else if (filter === "assignedByMe") {
+      query.createdBy = userId;
+    } else {
+      query.$or = [
+        { team: { $all: [userId] } },
+        { createdBy: userId }
+      ];
+    }
   }
   if (stage) {
     query.stage = stage;
+  }
+
+  if (lessThan3Days) {
+    const now = new Date();
+    const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    query.deadline = { $lte: threeDaysLater, $gte: now };
   }
 
   if (search) {
@@ -259,14 +288,20 @@ const getTasks = asyncHandler(async (req, res) => {
     query = { ...query, ...searchQuery };
   }
 
+  console.log('DEBUG: getTasks query:', query);
   let queryResult = Task.find(query)
     .populate({
       path: "team",
       select: "name title email",
     })
+    .populate({
+      path: "createdBy",
+      select: "_id name email",
+    })
     .sort({ _id: -1 });
 
   const tasks = await queryResult;
+  console.log('DEBUG: getTasks found:', tasks.length);
 
   res.status(200).json({
     status: true,
@@ -286,6 +321,10 @@ const getTask = asyncHandler(async (req, res) => {
       .populate({
         path: "activities.by",
         select: "name",
+      })
+      .populate({
+        path: "createdBy",
+        select: "_id name email",
       })
       .sort({ _id: -1 });
 
@@ -326,37 +365,41 @@ const postTaskActivity = asyncHandler(async (req, res) => {
 
 const trashTask = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
+  const userId = req.user._id;
+  const isAdmin = req.user.isAdmin;
   try {
     const task = await Task.findById(id);
-
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found" });
+    }
+    if (!isAdmin && String(task.createdBy) !== String(userId)) {
+      return res.status(403).json({ status: false, message: "Not authorized to delete this task" });
+    }
     task.isTrashed = true;
-
     await task.save();
-
-    res.status(200).json({
-      status: true,
-      message: `Task trashed successfully.`,
-    });
+    res.status(200).json({ status: true, message: `Task trashed successfully.` });
   } catch (error) {
     return res.status(400).json({ status: false, message: error.message });
   }
 });
 
 const deleteRestoreTask = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user._id;
+  const isAdmin = req.user.isAdmin;
+  const { actionType } = req.query;
   try {
-    const { id } = req.params;
-    const { actionType } = req.query;
-
+    const task = id ? await Task.findById(id) : null;
+    if (id && task && !isAdmin && String(task.createdBy) !== String(userId)) {
+      return res.status(403).json({ status: false, message: "Not authorized to delete/restore this task" });
+    }
     if (actionType === "delete") {
       await Task.findByIdAndDelete(id);
     } else if (actionType === "deleteAll") {
       await Task.deleteMany({ isTrashed: true });
     } else if (actionType === "restore") {
       const resp = await Task.findById(id);
-
       resp.isTrashed = false;
-
       resp.save();
     } else if (actionType === "restoreAll") {
       await Task.updateMany(
@@ -364,11 +407,7 @@ const deleteRestoreTask = asyncHandler(async (req, res) => {
         { $set: { isTrashed: false } }
       );
     }
-
-    res.status(200).json({
-      status: true,
-      message: `Operation performed successfully.`,
-    });
+    res.status(200).json({ status: true, message: `Operation performed successfully.` });
   } catch (error) {
     return res.status(400).json({ status: false, message: error.message });
   }
@@ -376,25 +415,35 @@ const deleteRestoreTask = asyncHandler(async (req, res) => {
 
 const dashboardStatistics = asyncHandler(async (req, res) => {
   try {
-    const { userId, isAdmin } = req.user;
+    const userId = req.user._id;
+    const isAdmin = req.user.isAdmin;
 
     // Fetch all tasks from the database
     const allTasks = isAdmin
-      ? await Task.find({
+      ? await Task.find({ isTrashed: false })
+          .populate({
+            path: "team",
+            select: "name role title email",
+          })
+          .populate({
+            path: "createdBy",
+            select: "_id name email",
+          })
+          .sort({ _id: -1 })
+      : await Task.find({
           isTrashed: false,
+          $or: [
+            { team: { $all: [userId] } },
+            { createdBy: userId }
+          ]
         })
           .populate({
             path: "team",
             select: "name role title email",
           })
-          .sort({ _id: -1 })
-      : await Task.find({
-          isTrashed: false,
-          team: { $all: [userId] },
-        })
           .populate({
-            path: "team",
-            select: "name role title email",
+            path: "createdBy",
+            select: "_id name email",
           })
           .sort({ _id: -1 });
 
@@ -403,26 +452,19 @@ const dashboardStatistics = asyncHandler(async (req, res) => {
       .limit(10)
       .sort({ _id: -1 });
 
-    // Group tasks by stage and calculate counts
-    const groupedTasks = allTasks?.reduce((result, task) => {
-      const stage = task.stage;
-
-      if (!result[stage]) {
-        result[stage] = 1;
-      } else {
-        result[stage] += 1;
-      }
-
+    // Group tasks by stage and calculate counts (ensure all stages are present)
+    const STAGES = ["todo", "in progress", "completed"];
+    const groupedTasks = STAGES.reduce((result, stage) => {
+      result[stage] = allTasks.filter((t) => t.stage === stage).length;
       return result;
     }, {});
 
-    const graphData = Object.entries(
-      allTasks?.reduce((result, task) => {
-        const { priority } = task;
-        result[priority] = (result[priority] || 0) + 1;
-        return result;
-      }, {})
-    ).map(([name, total]) => ({ name, total }));
+    // Group tasks by priority (ensure all priorities are present)
+    const PRIORITIES = ["high", "medium", "normal", "low"];
+    const graphData = PRIORITIES.map((priority) => ({
+      name: priority,
+      total: allTasks.filter((t) => t.priority === priority).length,
+    }));
 
     // Calculate total tasks
     const totalTasks = allTasks.length;
@@ -446,6 +488,31 @@ const dashboardStatistics = asyncHandler(async (req, res) => {
   }
 });
 
+const markTaskCompleted = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user._id;
+  const isAdmin = req.user.isAdmin;
+  try {
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found" });
+    }
+    if (!isAdmin && String(task.createdBy) !== String(userId)) {
+      return res.status(403).json({ status: false, message: "Not authorized to mark this task as completed" });
+    }
+    task.isCompleted = !task.isCompleted;
+    if (task.isCompleted) {
+      task.stage = "completed";
+    } else {
+      task.stage = "todo";
+    }
+    await task.save();
+    res.status(200).json({ status: true, message: `Task marked as ${task.isCompleted ? "completed" : "not completed"}.`, isCompleted: task.isCompleted });
+  } catch (error) {
+    return res.status(400).json({ status: false, message: error.message });
+  }
+});
+
 export {
   createSubTask,
   createTask,
@@ -459,4 +526,5 @@ export {
   updateSubTaskStage,
   updateTask,
   updateTaskStage,
+  markTaskCompleted,
 };
