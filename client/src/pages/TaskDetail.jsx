@@ -231,7 +231,7 @@ const TaskDetail = () => {
 
   const handleMarkCompleted = async () => {
     try {
-      const res = await fetch(`/api/task/${task._id}/mark-completed`, {
+      const res = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/api/task/${task._id}/mark-completed`, {
         method: "PUT",
         credentials: "include",
       });
